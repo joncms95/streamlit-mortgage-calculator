@@ -1,6 +1,6 @@
 import streamlit as st
 import math
-import plotly.graph_objects as go
+import plotly.express as px
 
 
 class MortgageCalculator:
@@ -111,13 +111,12 @@ class MortgageCalculator:
                 for income in incomes
             ]
 
-            fig = go.Figure()
-            fig.add_trace(go.Bar(x=incomes, y=affordabilities))
-            fig.update_layout(
-                title="Home Affordability vs. Monthly Income",
-                xaxis_title="Monthly Income ($)",
-                yaxis_title="Maximum Home Price ($)",
+            fig = px.bar(
+                x=incomes,
+                y=affordabilities,
+                labels={"x": "Monthly Income ($)", "y": "Maximum Home Price ($)"},
             )
+            fig.update_layout(title="Home Affordability vs. Monthly Income")
 
             st.plotly_chart(fig)
 
@@ -146,15 +145,11 @@ class MortgageCalculator:
             )
             total_upfront_costs = down_payment + closing_costs
 
-            # Pie chart for upfront costs
-            fig = go.Figure(
-                data=[
-                    go.Pie(
-                        labels=["Down Payment", "Closing Costs"],
-                        values=[down_payment, closing_costs],
-                        hole=0.4,
-                    )
-                ]
+            fig = px.pie(
+                names=["Down Payment", "Closing Costs"],
+                values=[down_payment, closing_costs],
+                hole=0.4,
+                labels={"names": "Category", "values": "Amount ($)"},
             )
             fig.update_layout(title="Upfront Costs Distribution")
 
