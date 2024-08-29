@@ -27,7 +27,7 @@ class MortgageCalculator:
         # Main
         st.title("Mortgage Calculator :house:")
         st.caption(
-            "Disclaimer: This tool is designed for mortgage calculations in Malaysia and provides estimation only."
+            "Disclaimer: This tool is designed for mortgage calculations in Malaysia and provides estimation only"
         )
 
         if self.page == "Monthly Mortgage Estimation":
