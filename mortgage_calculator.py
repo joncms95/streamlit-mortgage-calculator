@@ -114,18 +114,26 @@ class MortgageCalculator:
             monthly_interest_rate = interest_rate / 100 / 12
             interest_payment = loan_amount * monthly_interest_rate
             principal_payment = monthly_payment - interest_payment
+            data = {
+                "Payment Breakdown": ["Principal", "Interest"],
+                "Amount ($)": [round(principal_payment, 2), round(interest_payment, 2)],
+            }
 
             fig = px.bar(
-                x=["Principal Paid", "Interest Paid"],
-                y=[principal_payment, interest_payment],
-                labels={"x": "Payment Type", "y": "Amount ($)"},
+                data,
+                x="Amount ($)",
+                y="Payment Breakdown",
+                color="Payment Breakdown",
+                color_discrete_map={"Principal": "blue", "Interest": "red"},
+                labels={"x": "Amount ($)", "y": "Payment Breakdown"},
                 title="Principal and Interest Breakdown for the First Month",
-                color=["Principal Paid", "Interest Paid"],
-                color_discrete_map={"Principal Paid": "blue", "Interest Paid": "red"},
+                orientation="h",
             )
             fig.update_layout(
-                legend_title_text="Payment Breakdown", yaxis=dict(title="Amount ($)")
+                xaxis_title="Amount ($)",
+                yaxis_title="Payment Breakdown",
             )
+
             st.plotly_chart(fig)
 
     def show_home_affordability(self):
@@ -160,9 +168,7 @@ class MortgageCalculator:
             st.markdown("***")
 
             # Plot chart
-            incomes = list(
-                range(3000, 15001, 1000)
-            )  # Monthly incomes from 3k to MYR 15k
+            incomes = list(range(3000, 15001, 1000))  # Monthly incomes from 3k to 15k
             affordabilities = [
                 self.calculate_home_affordability(
                     income, monthly_debts, interest_rate, loan_tenure
@@ -176,6 +182,7 @@ class MortgageCalculator:
                 labels={"x": "Monthly Income ($)", "y": "Maximum Home Price ($)"},
             )
             fig.update_layout(title="Home Affordability vs. Monthly Income")
+
             st.plotly_chart(fig)
             st.caption(
                 """
@@ -191,7 +198,10 @@ class MortgageCalculator:
             "Property Price ($)", min_value=50000, value=300000, step=100000
         )
         loan_amount = st.number_input(
-            "Loan Amount ($)", min_value=0, value=int(property_price * 0.9), step=100000
+            "Loan Amount ($)",
+            min_value=90000,
+            value=int(property_price * 0.9),
+            step=100000,
         )
         discount_percent = st.number_input(
             "Discount (%)", min_value=0, max_value=100, value=0, step=1
@@ -247,59 +257,43 @@ class MortgageCalculator:
                 if waived_fees["mot_stamp_duty"]
                 else self.calculate_mot_stamp_duty(property_price)
             )
-            spa_legal_fees = (
-                0
-                if waived_fees["spa_legal_fees"]
-                else self.calculate_legal_fees(property_price)
-            )
             loan_legal_fees = (
                 0
                 if waived_fees["loan_legal_fees"]
                 else self.calculate_legal_fees(property_price)
             )
-            total_upfront_costs = (
-                down_payment
-                + loan_stamp_duty
-                + mot_stamp_duty
-                + spa_legal_fees
-                + loan_legal_fees
+            spa_legal_fees = (
+                0
+                if waived_fees["spa_legal_fees"]
+                else self.calculate_legal_fees(property_price)
             )
+            total_fees = (
+                loan_stamp_duty + mot_stamp_duty + loan_legal_fees + spa_legal_fees
+            )
+            total_upfront_costs = down_payment + total_fees
+
+            total_label = "Total Upfront Costs"
+            pie_labels = [
+                "Stamp Duty for LA",
+                "Stamp Duty for MOT",
+                "Legal Fees for LA",
+                "Legal Fees for SPA",
+            ]
+            pie_values = [
+                loan_stamp_duty,
+                mot_stamp_duty,
+                loan_legal_fees,
+                spa_legal_fees,
+            ]
 
             if discount_percent > 10:
                 down_payment_label = "Rebates"
-                if abs(down_payment) > loan_stamp_duty + mot_stamp_duty:
+                if abs(down_payment) > (total_fees):
                     total_label = "Total Rebates"
-                else:
-                    total_label = "Total Upfront Costs"
-                pie_labels = [
-                    "Stamp Duty for LA",
-                    "Stamp Duty for MOT",
-                    "Legal Fees for LA",
-                    "Legal Fees for SPA",
-                ]
-                pie_values = [
-                    loan_stamp_duty,
-                    mot_stamp_duty,
-                    loan_legal_fees,
-                    spa_legal_fees,
-                ]
             else:
                 down_payment_label = "Down Payment"
-                total_label = "Total Upfront Costs"
-                pie_labels = [
-                    "Down Payment",
-                    "Stamp Duty for LA",
-                    "Stamp Duty for MOT",
-                    "Legal Fees for LA",
-                    "Legal Fees for SPA",
-                ]
-                pie_values = [
-                    down_payment,
-                    loan_stamp_duty,
-                    mot_stamp_duty,
-                    loan_legal_fees,
-                    spa_legal_fees,
-                ]
+                pie_labels.append(down_payment_label)
+                pie_values.append(down_payment)
 
             results = {
                 down_payment_label: f"${abs(down_payment):,.2f}",
@@ -322,6 +316,7 @@ class MortgageCalculator:
                 labels={"names": "Category", "values": "Amount ($)"},
             )
             fig.update_layout(title="Upfront Costs Distribution")
+
             st.plotly_chart(fig)
             st.caption(
                 """
