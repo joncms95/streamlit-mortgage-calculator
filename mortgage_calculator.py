@@ -4,6 +4,8 @@ import plotly.express as px
 
 
 class MortgageCalculator:
+    """A Streamlit app for various mortgage-related calculations."""
+
     TYPES = [
         "Monthly Mortgage Estimation",
         "Home Affordability Estimation",
@@ -11,11 +13,8 @@ class MortgageCalculator:
     ]
 
     def __init__(self):
-        if "check_results" not in st.session_state:
-            st.session_state.check_results = False
-        if "auto_check" not in st.session_state:
-            st.session_state.auto_check = False
-
+        st.session_state.setdefault("auto_check", True)
+        st.session_state.setdefault("check_results", False)
         self.render()
 
     def render(self):
@@ -25,12 +24,14 @@ class MortgageCalculator:
         # Sidebar
         with st.sidebar:
             st.title("Calculators :1234:")
-            self.page = st.selectbox("*Select a calculator: :point_down:", self.TYPES)
+            self.page = st.selectbox("*Select an option: :point_down:", self.TYPES)
             self.auto_check = st.checkbox(
                 "Always Check Results", value=st.session_state.auto_check
             )
             st.divider()
-            self.check_button()
+
+            if not self.auto_check:
+                self.check_button()
 
         # Main
         st.title("Mortgage Calculator :house:")
@@ -72,7 +73,7 @@ class MortgageCalculator:
             maintenance_cost = square_feet * maintenance_fees_per_sqft
             total_monthly_payment = monthly_payment + maintenance_cost
 
-            self.display_check_results(
+            self.display_results(
                 {
                     "Monthly Mortgage Payment": f"${monthly_payment:,.2f}",
                     "Maintenance Cost": f"${maintenance_cost:,.2f}",
@@ -120,9 +121,7 @@ class MortgageCalculator:
 
             st.plotly_chart(fig)
 
-            self.display_check_results(
-                {"Maximum Home Price": f"$ {max_home_price:,.2f}"}
-            )
+            self.display_results({"Maximum Home Price": f"${max_home_price:,.2f}"})
 
     def show_upfront_costs(self):
         st.header(f"{self.page}", divider=True)
@@ -155,7 +154,7 @@ class MortgageCalculator:
 
             st.plotly_chart(fig)
 
-            self.display_check_results(
+            self.display_results(
                 {
                     "Down Payment": f"${down_payment:,.2f}",
                     "Closing Costs": f"${closing_costs:,.2f}",
@@ -201,10 +200,17 @@ class MortgageCalculator:
     def calculate_closing_costs(self, home_price, closing_costs_percent):
         return home_price * closing_costs_percent / 100
 
-    def display_check_results(self, results):
-        st.subheader("Results", divider=True)
-        for key, value in results.items():
-            st.write(f"**{key}:** {value}")
+    def display_results(self, results):
+        with st.sidebar:
+            st.subheader("Results", divider=True)
+
+            for key, value in results.items():
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    st.markdown(f"**{key}:**")
+                with col2:
+                    st.markdown(f"{value}")
+            st.markdown("---")
 
 
 if __name__ == "__main__":
