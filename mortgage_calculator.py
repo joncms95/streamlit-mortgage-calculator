@@ -60,8 +60,14 @@ class MortgageCalculator:
         st.header(f"{self.page}", divider=True)
         st.subheader(f"Data Input", divider=True)
 
+        property_price = st.number_input(
+            "Property Price ($)", min_value=50000, value=300000, step=100000
+        )
         loan_amount = st.number_input(
-            "Loan Amount ($)", min_value=10000, value=300000, step=100000
+            "Loan Amount ($)",
+            min_value=90000,
+            value=int(property_price * 0.9),
+            step=100000,
         )
         interest_rate = st.number_input(
             "Interest Rate (%)", min_value=0.01, value=3.9, step=0.05
@@ -147,7 +153,7 @@ class MortgageCalculator:
             "Monthly Commitments ($)", min_value=0, value=500, step=100
         )
         interest_rate = st.number_input(
-            "Interest Rate (%)", min_value=0.01, value=3.9, step=0.01
+            "Interest Rate (%)", min_value=0.01, value=3.9, step=0.05
         )
         loan_tenure = st.selectbox(
             "Loan Tenure (Years)",
