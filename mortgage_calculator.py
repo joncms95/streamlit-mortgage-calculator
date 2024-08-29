@@ -6,7 +6,7 @@ import plotly.express as px
 class MortgageCalculator:
     """A Streamlit app for various mortgage-related calculations."""
 
-    TYPES = [
+    CALCULATORS = [
         "Monthly Mortgage Estimation",
         "Home Affordability Estimation",
         "Upfront Costs Estimation",
@@ -22,25 +22,35 @@ class MortgageCalculator:
         st.session_state.check_results = False
 
         # Sidebar
-        with st.sidebar:
-            st.title("Calculators :1234:")
-            self.page = st.selectbox("*Select an option: :point_down:", self.TYPES)
-            self.auto_check = st.checkbox(
-                "Always Check Results", value=st.session_state.auto_check
-            )
-            st.divider()
-
-            if not self.auto_check:
-                self.check_button()
+        self.render_sidebar()
 
         # Main
         st.title("Mortgage Calculator :house:")
+
+        st.caption(
+            "Disclaimer: This tool is designed for mortgage calculations in Malaysia and provides estimation only."
+        )
+
         if self.page == "Monthly Mortgage Estimation":
             return self.show_monthly_mortgage()
         if self.page == "Home Affordability Estimation":
             return self.show_home_affordability()
         if self.page == "Upfront Costs Estimation":
             return self.show_upfront_costs()
+
+    def render_sidebar(self):
+        with st.sidebar:
+            st.title("Calculators :1234:")
+            self.page = st.selectbox(
+                "*Select an option: :point_down:", self.CALCULATORS
+            )
+            self.auto_check = st.toggle(
+                "Always Check Results", value=st.session_state.auto_check
+            )
+            st.divider()
+
+            if not self.auto_check:
+                self.check_button()
 
     def check_button(self):
         if st.button("Check Results"):
@@ -54,56 +64,100 @@ class MortgageCalculator:
             "Loan Amount ($)", min_value=10000, value=300000, step=100000
         )
         interest_rate = st.number_input(
-            "Interest Rate (%)", min_value=1.0, value=3.9, step=0.01
+            "Interest Rate (%)", min_value=0.01, value=3.9, step=0.05
         )
-        loan_tenure = st.number_input(
-            "Loan Tenure (Years)", min_value=5, value=35, step=1
-        )
-        square_feet = st.number_input(
-            "Total Square Feet", min_value=100, value=900, step=100
-        )
-        maintenance_fees_per_sqft = st.number_input(
-            "Maintenance Fees per Square Feet ($)", min_value=0.0, value=0.3, step=0.05
+        loan_tenure = st.selectbox(
+            "Loan Tenure (Years)",
+            list(range(5, 36)),
+            index=30,
         )
 
+        # Check for maintenance fees
+        has_maintenance_fees = st.toggle("Include maintenance fees? :wrench:")
+        if has_maintenance_fees:
+            square_feet = st.number_input(
+                "Unit Size (sq ft)", min_value=100, value=900, step=100
+            )
+            maintenance_fees_per_sqft = st.number_input(
+                "Maintenance Fees per sq ft ($)",
+                min_value=0.0,
+                value=0.3,
+                step=0.05,
+            )
+
+        # Show results
         if self.auto_check or st.session_state.check_results:
             monthly_payment = self.calculate_monthly_payment(
                 loan_amount, interest_rate, loan_tenure
             )
-            maintenance_cost = square_feet * maintenance_fees_per_sqft
-            total_monthly_payment = monthly_payment + maintenance_cost
 
-            self.display_results(
-                {
-                    "Monthly Mortgage Payment": f"${monthly_payment:,.2f}",
-                    "Maintenance Cost": f"${maintenance_cost:,.2f}",
-                    "Total Monthly Payment": f"${total_monthly_payment:,.2f}",
-                }
+            results = {
+                "Monthly Installment": f"${monthly_payment:,.2f}",
+            }
+
+            if has_maintenance_fees:
+                maintenance_cost = square_feet * maintenance_fees_per_sqft
+                total_monthly_payment = monthly_payment + maintenance_cost
+
+                results.update(
+                    {
+                        "Maintenance Fees": f"${maintenance_cost:,.2f}",
+                        "Total Monthly Payment": f"${total_monthly_payment:,.2f}",
+                    }
+                )
+
+            st.markdown("***")
+
+            # Plot chart
+            monthly_interest_rate = interest_rate / 100 / 12
+            interest_payment = loan_amount * monthly_interest_rate
+            principal_payment = monthly_payment - interest_payment
+
+            fig = px.bar(
+                x=["Principal Paid", "Interest Paid"],
+                y=[principal_payment, interest_payment],
+                labels={"x": "Payment Type", "y": "Amount ($)"},
+                title="Principal and Interest Breakdown for the First Month",
+                color=["Principal Paid", "Interest Paid"],
+                color_discrete_map={"Principal Paid": "blue", "Interest Paid": "red"},
             )
+
+            fig.update_layout(
+                legend_title_text="Payment Breakdown", yaxis=dict(title="Amount ($)")
+            )
+
+            st.plotly_chart(fig)
+
+            self.display_results(results)
 
     def show_home_affordability(self):
         st.header(f"{self.page}", divider=True)
         st.subheader(f"Data Input", divider=True)
 
         monthly_income = st.number_input(
-            "Monthly Income ($)", min_value=3000, value=5000, step=1000
+            "Monthly Net Income ($)", min_value=3000, value=5000, step=1000
         )
         monthly_debts = st.number_input(
-            "Monthly Debts ($)", min_value=0, value=500, step=100
+            "Monthly Commitments ($)", min_value=0, value=500, step=100
         )
         interest_rate = st.number_input(
-            "Interest Rate (%)", min_value=1.0, value=3.9, step=0.01
+            "Interest Rate (%)", min_value=0.01, value=3.9, step=0.01
         )
-        loan_tenure = st.number_input(
-            "Loan Tenure (Years)", min_value=5, value=35, step=1
+        loan_tenure = st.selectbox(
+            "Loan Tenure (Years)",
+            list(range(5, 36)),
+            index=30,
         )
 
+        # Show results
         if self.auto_check or st.session_state.check_results:
-            max_home_price = self.calculate_home_affordability(
+            max_property_price = self.calculate_home_affordability(
                 monthly_income, monthly_debts, interest_rate, loan_tenure
             )
 
-            # Create a range of incomes for visualization
+            st.markdown("***")
+
+            # Plot chart
             incomes = list(
                 range(3000, 15001, 1000)
             )  # Monthly incomes from 3k to MYR 15k
@@ -123,31 +177,103 @@ class MortgageCalculator:
 
             st.plotly_chart(fig)
 
-            self.display_results({"Maximum Home Price": f"${max_home_price:,.2f}"})
+            self.display_results(
+                {"Suggested Property Value": f"${max_property_price:,.2f}"}
+            )
+
+            st.caption(
+                """
+                **Calculations are done assuming a debt-to-income ratio of 30%**
+                """
+            )
 
     def show_upfront_costs(self):
         st.header(f"{self.page}", divider=True)
         st.subheader(f"Data Input", divider=True)
 
-        home_price = st.number_input(
-            "Home Price ($)", min_value=50000, value=300000, step=100000
+        property_price = st.number_input(
+            "Property Price ($)", min_value=50000, value=300000, step=100000
         )
-        loan_amount = st.number_input("Loan Amount ($)", value=int(home_price * 0.9))
+        loan_amount = st.number_input(
+            "Loan Amount ($)", min_value=0, value=int(property_price * 0.9), step=100000
+        )
+        discount_percent = st.number_input(
+            "Discount (%)", min_value=0, max_value=100, value=0, step=1
+        )
         down_payment_percent = st.number_input(
-            "Down Payment (%)", min_value=0, value=10, step=1
+            "Down Payment (%)", value=int(10 - discount_percent), disabled=True
         )
         stamp_duty_percent = st.number_input(
-            "Loan Stamp Duty (%)", min_value=0.1, value=0.5, step=0.1
+            "Stamp Duty for Loan Agreement (%)",
+            min_value=0.1,
+            value=0.5,
+            step=0.05,
+            disabled=True,
         )
 
-        if self.auto_check or st.session_state.check_results:
-            down_payment = self.calculate_down_payment(home_price, down_payment_percent)
-            stamp_duty = self.calculate_stamp_duty(loan_amount, stamp_duty_percent)
-            total_upfront_costs = down_payment + stamp_duty
+        # Check waived fees
+        has_waived_fees = st.toggle("Any waived fees? :grinning:")
+        waived_fees = {
+            "loan_stamp_duty": (
+                st.checkbox("Stamp Duty for Loan Agreement (LA)")
+                if has_waived_fees
+                else False
+            ),
+            "mot_stamp_duty": (
+                st.checkbox("Stamp Duty for Memorandum of Transfer (MOT)")
+                if has_waived_fees
+                else False
+            ),
+            "legal_fees": st.checkbox("Legal Fees") if has_waived_fees else False,
+        }
 
+        # Show results
+        if self.auto_check or st.session_state.check_results:
+            down_payment = self.calculate_down_payment(
+                property_price, down_payment_percent
+            )
+            loan_stamp_duty = (
+                0
+                if waived_fees["loan_stamp_duty"]
+                else self.calculate_loan_stamp_duty(loan_amount, stamp_duty_percent)
+            )
+            mot_stamp_duty = (
+                0
+                if waived_fees["mot_stamp_duty"]
+                else self.calculate_mot_stamp_duty(property_price)
+            )
+            legal_fees = (
+                0
+                if waived_fees["legal_fees"]
+                else self.calculate_legal_fees(property_price)
+            )
+            total_upfront_costs = down_payment + loan_stamp_duty + mot_stamp_duty
+
+            if discount_percent > 10:
+                down_payment_label = "Rebates"
+                if abs(down_payment) > loan_stamp_duty + mot_stamp_duty:
+                    total_label = "Total Rebates"
+                else:
+                    total_label = "Total Upfront Costs"
+                pie_labels = ["Stamp Duty for LA", "Stamp Duty for MOT", "Legal Fees"]
+                pie_values = [loan_stamp_duty, mot_stamp_duty, legal_fees]
+            else:
+                down_payment_label = "Down Payment"
+                total_label = "Total Upfront Costs"
+                pie_labels = [
+                    "Down Payment",
+                    "Stamp Duty for LA",
+                    "Stamp Duty for MOT",
+                    "Legal Fees",
+                ]
+                pie_values = [down_payment, loan_stamp_duty, mot_stamp_duty, legal_fees]
+
+            st.markdown("***")
+
+            # Plot chart
             fig = px.pie(
-                names=["Down Payment", "Loan Stamp Duty"],
-                values=[down_payment, stamp_duty],
+                names=pie_labels,
+                values=pie_values,
                 hole=0.4,
                 labels={"names": "Category", "values": "Amount ($)"},
             )
@@ -155,12 +281,27 @@ class MortgageCalculator:
 
             st.plotly_chart(fig)
 
-            self.display_results(
-                {
-                    "Down Payment": f"${down_payment:,.2f}",
-                    "Loan Stamp Duty": f"${stamp_duty:,.2f}",
-                    "Total Upfront Costs": f"${total_upfront_costs:,.2f}",
-                }
+            results = {
+                down_payment_label: f"${abs(down_payment):,.2f}",
+                "Stamp Duty for LA": f"${loan_stamp_duty:,.2f}",
+                "Stamp Duty for MOT": f"${mot_stamp_duty:,.2f}",
+                "Legal Fees": f"${legal_fees:,.2f}",
+                total_label: f"${abs(total_upfront_costs):,.2f}",
+            }
+
+            self.display_results(results)
+
+            st.caption(
+                """
+                **For properties up to RM100,000:**
+                - MOT is calculated as **1%** of the property price.
+
+                **For properties between RM100,001 and RM500,000:**
+                - MOT is calculated as **RM1,000** + **2%** of the amount above RM100,000.
+
+                **For properties above RM500,000:**
+                - MOT is calculated as **RM1,000** + **RM8,000** + **3%** of the amount above RM500,000.
+                """
             )
 
     # Utility Methods for Calculations
@@ -195,11 +336,33 @@ class MortgageCalculator:
 
         return max_loan
 
-    def calculate_down_payment(self, home_price, down_payment_percent):
-        return home_price * down_payment_percent / 100
+    def calculate_down_payment(self, property_price, down_payment_percent):
+        return property_price * down_payment_percent / 100
 
-    def calculate_stamp_duty(self, loan_amount, stamp_duty_percent):
+    def calculate_loan_stamp_duty(self, loan_amount, stamp_duty_percent):
         return loan_amount * stamp_duty_percent / 100
+
+    def calculate_mot_stamp_duty(self, property_price):
+        if property_price <= 100000:
+            return 0.01 * property_price
+        elif property_price <= 500000:
+            return 1000 + 0.02 * (property_price - 100000)
+        else:
+            return 1000 + 8000 + 0.03 * (property_price - 500000)
+
+    def calculate_legal_fees(self, property_price):
+        if property_price <= 500000:
+            fee = property_price * 0.01
+        elif property_price <= 1000000:
+            fee = 5000 + (property_price - 500000) * 0.008
+        elif property_price <= 3000000:
+            fee = 9000 + (property_price - 1000000) * 0.007
+        elif property_price <= 5000000:
+            fee = 24000 + (property_price - 3000000) * 0.006
+        else:
+            fee = 36000 + (property_price - 5000000) * 0.005
+
+        return fee
 
     def display_results(self, results):
         with st.sidebar:
