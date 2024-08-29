@@ -60,10 +60,10 @@ class MortgageCalculator:
             "Loan Tenure (Years)", min_value=5, value=35, step=1
         )
         square_feet = st.number_input(
-            "Total Square Feet", min_value=100, value=2000, step=100
+            "Total Square Feet", min_value=100, value=900, step=100
         )
         maintenance_fees_per_sqft = st.number_input(
-            "Maintenance Fees per Square Foot ($)", min_value=0.0, value=0.5, step=0.05
+            "Maintenance Fees per Square Feet ($)", min_value=0.0, value=0.3, step=0.05
         )
 
         if self.auto_check or st.session_state.check_results:
@@ -86,14 +86,16 @@ class MortgageCalculator:
         st.subheader(f"Data Input", divider=True)
 
         monthly_income = st.number_input(
-            "Monthly Income ($)", min_value=2000, value=7500, step=100
+            "Monthly Income ($)", min_value=3000, value=5000, step=1000
         )
         monthly_debts = st.number_input(
-            "Monthly Debts ($)", min_value=0, value=500, step=50
+            "Monthly Debts ($)", min_value=0, value=500, step=100
         )
-        interest_rate = st.number_input("Interest Rate (%)", min_value=0.1, value=3.5)
+        interest_rate = st.number_input(
+            "Interest Rate (%)", min_value=1.0, value=3.9, step=0.01
+        )
         loan_tenure = st.number_input(
-            "Loan Tenure (Years)", min_value=5, value=30, step=1
+            "Loan Tenure (Years)", min_value=5, value=35, step=1
         )
 
         if self.auto_check or st.session_state.check_results:
@@ -128,25 +130,24 @@ class MortgageCalculator:
         st.subheader(f"Data Input", divider=True)
 
         home_price = st.number_input(
-            "Home Price ($)", min_value=50000, value=300000, step=10000
+            "Home Price ($)", min_value=50000, value=300000, step=100000
         )
+        loan_amount = st.number_input("Loan Amount ($)", value=int(home_price * 0.9))
         down_payment_percent = st.number_input(
-            "Down Payment (%)", min_value=5, value=20, step=1
+            "Down Payment (%)", min_value=0, value=10, step=1
         )
-        closing_costs_percent = st.number_input(
-            "Closing Costs (%)", min_value=1.0, value=3.0, step=0.5
+        stamp_duty_percent = st.number_input(
+            "Loan Stamp Duty (%)", min_value=0.1, value=0.5, step=0.1
         )
 
         if self.auto_check or st.session_state.check_results:
             down_payment = self.calculate_down_payment(home_price, down_payment_percent)
-            closing_costs = self.calculate_closing_costs(
-                home_price, closing_costs_percent
-            )
-            total_upfront_costs = down_payment + closing_costs
+            stamp_duty = self.calculate_stamp_duty(loan_amount, stamp_duty_percent)
+            total_upfront_costs = down_payment + stamp_duty
 
             fig = px.pie(
-                names=["Down Payment", "Closing Costs"],
-                values=[down_payment, closing_costs],
+                names=["Down Payment", "Loan Stamp Duty"],
+                values=[down_payment, stamp_duty],
                 hole=0.4,
                 labels={"names": "Category", "values": "Amount ($)"},
             )
@@ -157,7 +158,7 @@ class MortgageCalculator:
             self.display_results(
                 {
                     "Down Payment": f"${down_payment:,.2f}",
-                    "Closing Costs": f"${closing_costs:,.2f}",
+                    "Loan Stamp Duty": f"${stamp_duty:,.2f}",
                     "Total Upfront Costs": f"${total_upfront_costs:,.2f}",
                 }
             )
@@ -197,8 +198,8 @@ class MortgageCalculator:
     def calculate_down_payment(self, home_price, down_payment_percent):
         return home_price * down_payment_percent / 100
 
-    def calculate_closing_costs(self, home_price, closing_costs_percent):
-        return home_price * closing_costs_percent / 100
+    def calculate_stamp_duty(self, loan_amount, stamp_duty_percent):
+        return loan_amount * stamp_duty_percent / 100
 
     def display_results(self, results):
         with st.sidebar:
