@@ -26,7 +26,6 @@ class MortgageCalculator:
 
         # Main
         st.title("Mortgage Calculator :house:")
-
         st.caption(
             "Disclaimer: This tool is designed for mortgage calculations in Malaysia and provides estimation only."
         )
@@ -47,6 +46,7 @@ class MortgageCalculator:
             self.auto_check = st.toggle(
                 "Always Check Results", value=st.session_state.auto_check
             )
+
             st.divider()
 
             if not self.auto_check:
@@ -106,6 +106,8 @@ class MortgageCalculator:
                     }
                 )
 
+            self.display_results(results)
+
             st.markdown("***")
 
             # Plot chart
@@ -121,14 +123,10 @@ class MortgageCalculator:
                 color=["Principal Paid", "Interest Paid"],
                 color_discrete_map={"Principal Paid": "blue", "Interest Paid": "red"},
             )
-
             fig.update_layout(
                 legend_title_text="Payment Breakdown", yaxis=dict(title="Amount ($)")
             )
-
             st.plotly_chart(fig)
-
-            self.display_results(results)
 
     def show_home_affordability(self):
         st.header(f"{self.page}", divider=True)
@@ -155,6 +153,10 @@ class MortgageCalculator:
                 monthly_income, monthly_debts, interest_rate, loan_tenure
             )
 
+            self.display_results(
+                {"Suggested Property Value": f"${max_property_price:,.2f}"}
+            )
+
             st.markdown("***")
 
             # Plot chart
@@ -174,13 +176,7 @@ class MortgageCalculator:
                 labels={"x": "Monthly Income ($)", "y": "Maximum Home Price ($)"},
             )
             fig.update_layout(title="Home Affordability vs. Monthly Income")
-
             st.plotly_chart(fig)
-
-            self.display_results(
-                {"Suggested Property Value": f"${max_property_price:,.2f}"}
-            )
-
             st.caption(
                 """
                 **Calculations are done assuming a debt-to-income ratio of 30%**
@@ -224,7 +220,16 @@ class MortgageCalculator:
                 if has_waived_fees
                 else False
             ),
-            "legal_fees": st.checkbox("Legal Fees") if has_waived_fees else False,
+            "loan_legal_fees": (
+                st.checkbox("Legal Fees for Loan Agreement")
+                if has_waived_fees
+                else False
+            ),
+            "spa_legal_fees": (
+                st.checkbox("Legal Fees for Sales & Purchase Agreement (SPA)")
+                if has_waived_fees
+                else False
+            ),
         }
 
         # Show results
@@ -242,12 +247,23 @@ class MortgageCalculator:
                 if waived_fees["mot_stamp_duty"]
                 else self.calculate_mot_stamp_duty(property_price)
             )
-            legal_fees = (
+            spa_legal_fees = (
                 0
-                if waived_fees["legal_fees"]
+                if waived_fees["spa_legal_fees"]
                 else self.calculate_legal_fees(property_price)
             )
-            total_upfront_costs = down_payment + loan_stamp_duty + mot_stamp_duty
+            loan_legal_fees = (
+                0
+                if waived_fees["loan_legal_fees"]
+                else self.calculate_legal_fees(property_price)
+            )
+            total_upfront_costs = (
+                down_payment
+                + loan_stamp_duty
+                + mot_stamp_duty
+                + spa_legal_fees
+                + loan_legal_fees
+            )
 
             if discount_percent > 10:
                 down_payment_label = "Rebates"
@@ -255,8 +271,18 @@ class MortgageCalculator:
                     total_label = "Total Rebates"
                 else:
                     total_label = "Total Upfront Costs"
-                pie_labels = ["Stamp Duty for LA", "Stamp Duty for MOT", "Legal Fees"]
-                pie_values = [loan_stamp_duty, mot_stamp_duty, legal_fees]
+                pie_labels = [
+                    "Stamp Duty for LA",
+                    "Stamp Duty for MOT",
+                    "Legal Fees for LA",
+                    "Legal Fees for SPA",
+                ]
+                pie_values = [
+                    loan_stamp_duty,
+                    mot_stamp_duty,
+                    loan_legal_fees,
+                    spa_legal_fees,
+                ]
             else:
                 down_payment_label = "Down Payment"
                 total_label = "Total Upfront Costs"
@@ -264,9 +290,27 @@ class MortgageCalculator:
                     "Down Payment",
                     "Stamp Duty for LA",
                     "Stamp Duty for MOT",
-                    "Legal Fees",
+                    "Legal Fees for LA",
+                    "Legal Fees for SPA",
                 ]
-                pie_values = [down_payment, loan_stamp_duty, mot_stamp_duty, legal_fees]
+                pie_values = [
+                    down_payment,
+                    loan_stamp_duty,
+                    mot_stamp_duty,
+                    loan_legal_fees,
+                    spa_legal_fees,
+                ]
+
+            results = {
+                down_payment_label: f"${abs(down_payment):,.2f}",
+                "Stamp Duty for LA": f"${loan_stamp_duty:,.2f}",
+                "Stamp Duty for MOT": f"${mot_stamp_duty:,.2f}",
+                "Legal Fees for LA": f"${loan_legal_fees:,.2f}",
+                "Legal Fees for SPA": f"${spa_legal_fees:,.2f}",
+                total_label: f"${abs(total_upfront_costs):,.2f}",
+            }
+
+            self.display_results(results)
 
             st.markdown("***")
 
@@ -278,29 +322,19 @@ class MortgageCalculator:
                 labels={"names": "Category", "values": "Amount ($)"},
             )
             fig.update_layout(title="Upfront Costs Distribution")
-
             st.plotly_chart(fig)
-
-            results = {
-                down_payment_label: f"${abs(down_payment):,.2f}",
-                "Stamp Duty for LA": f"${loan_stamp_duty:,.2f}",
-                "Stamp Duty for MOT": f"${mot_stamp_duty:,.2f}",
-                "Legal Fees": f"${legal_fees:,.2f}",
-                total_label: f"${abs(total_upfront_costs):,.2f}",
-            }
-
-            self.display_results(results)
-
             st.caption(
                 """
-                **For properties up to RM100,000:**
-                - MOT is calculated as **1%** of the property price.
+                **MOT Stamp Duty Calculation:**
+                - **Up to RM100,000:** 1% of the property price.
+                - **RM100,001 to RM500,000:** RM1,000 + 2% of the amount above RM100,000.
+                - **RM500,001 to RM1,000,000:** RM9,000 + 3% of the amount above RM500,000.
+                - **Above RM1,000,000:** RM24,000 + 4% of the amount above RM1,000,000.
 
-                **For properties between RM100,001 and RM500,000:**
-                - MOT is calculated as **RM1,000** + **2%** of the amount above RM100,000.
-
-                **For properties above RM500,000:**
-                - MOT is calculated as **RM1,000** + **RM8,000** + **3%** of the amount above RM500,000.
+                **Legal Fees Calculation:**
+                - **Up to RM500,000:** 1.25% of property price, with minimum of RM500
+                - **RM500,000 to RM7,000,000:** RM6,250 + 1% of the amount above RM500,000
+                - **Above RM7,000,000:** RM76,250
                 """
             )
 
@@ -346,23 +380,19 @@ class MortgageCalculator:
         if property_price <= 100000:
             return 0.01 * property_price
         elif property_price <= 500000:
-            return 1000 + 0.02 * (property_price - 100000)
+            return 1000 + (0.02 * (property_price - 100000))
+        elif property_price <= 1000000:
+            return 9000 + (0.03 * (property_price - 500000))
         else:
-            return 1000 + 8000 + 0.03 * (property_price - 500000)
+            return 24000 + (0.04 * (property_price - 1000000))
 
     def calculate_legal_fees(self, property_price):
         if property_price <= 500000:
-            fee = property_price * 0.01
-        elif property_price <= 1000000:
-            fee = 5000 + (property_price - 500000) * 0.008
-        elif property_price <= 3000000:
-            fee = 9000 + (property_price - 1000000) * 0.007
-        elif property_price <= 5000000:
-            fee = 24000 + (property_price - 3000000) * 0.006
-        else:
-            fee = 36000 + (property_price - 5000000) * 0.005
-
-        return fee
+            return max(property_price * 0.0125, 500)
+        elif property_price > 500000:
+            return 6250 + (property_price - 500000) * 0.01
+        elif property_price > 7000000:
+            return 76250
 
     def display_results(self, results):
         with st.sidebar:
@@ -378,5 +408,5 @@ class MortgageCalculator:
 
 
 if __name__ == "__main__":
-    st.set_page_config("Mortgage Calculator", page_icon=":house:")
+    st.set_page_config("MY Mortgage Calculator", page_icon=":house:")
     MortgageCalculator()
