@@ -377,10 +377,9 @@ class MortgageCalculator:
                 if abs(down_payment) > (total_fees):
                     total_label = ":green[Total Rebates] (:heavy_plus_sign:)"
             else:
-                down_payment_label = "Down Payment"
-                pie_labels.append(down_payment_label)
-                pie_values.append(down_payment)
                 down_payment_label = ":red[Down Payment] (:heavy_minus_sign:)"
+                pie_labels.append("Down Payment")
+                pie_values.append(down_payment)
 
             results = {
                 down_payment_label: f"${abs(down_payment):,.2f}",
