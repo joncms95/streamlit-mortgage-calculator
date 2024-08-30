@@ -1,5 +1,6 @@
 import streamlit as st
 import math
+import pandas as pd
 import plotly.express as px
 
 
@@ -68,6 +69,7 @@ class MortgageCalculator:
             min_value=90000,
             value=int(property_price * 0.9),
             step=100000,
+            help="Loan amount will be automatically calculated as 90% of property price unless stated otherwise",
         )
         interest_rate = st.number_input(
             "Interest Rate (%)", min_value=0.01, value=3.9, step=0.05
@@ -98,7 +100,7 @@ class MortgageCalculator:
             )
 
             results = {
-                "Monthly Installment": f"${monthly_payment:,.2f}",
+                "Monthly Instalment": f"${monthly_payment:,.2f}",
             }
 
             if has_maintenance_fees:
@@ -108,7 +110,7 @@ class MortgageCalculator:
                 results.update(
                     {
                         "Maintenance Fees": f"${maintenance_cost:,.2f}",
-                        "Total Monthly Payment": f"${total_monthly_payment:,.2f}",
+                        ":red[Total Monthly Payment]": f"${total_monthly_payment:,.2f}",
                     }
                 )
 
@@ -117,40 +119,108 @@ class MortgageCalculator:
             st.markdown("***")
 
             # Plot chart
-            monthly_interest_rate = interest_rate / 100 / 12
-            interest_payment = loan_amount * monthly_interest_rate
-            principal_payment = monthly_payment - interest_payment
-            data = {
-                "Payment Breakdown": ["Principal", "Interest"],
-                "Amount ($)": [round(principal_payment, 2), round(interest_payment, 2)],
-            }
+            schedule = []
+            monthly_interest_rate = (interest_rate / 100) / 12
+            remaining_balance = loan_amount
+            total_interest_paid = 0
 
-            fig = px.bar(
-                data,
-                x="Amount ($)",
-                y="Payment Breakdown",
-                color="Payment Breakdown",
-                color_discrete_map={"Principal": "blue", "Interest": "red"},
-                labels={"x": "Amount ($)", "y": "Payment Breakdown"},
-                title="Principal and Interest Breakdown for the First Month",
-                orientation="h",
+            for month in range(1, loan_tenure * 12 + 1):
+                interest_payment = remaining_balance * monthly_interest_rate
+                principal_payment = monthly_payment - interest_payment
+                remaining_balance -= principal_payment
+                total_interest_paid += interest_payment
+
+                schedule.append(
+                    {
+                        "Month": month,
+                        "Principal Payment": round(principal_payment, 2),
+                        "Interest Payment": round(interest_payment, 2),
+                        "Total Payment": round(monthly_payment, 2),
+                        "Remaining Balance": round(remaining_balance, 2),
+                    }
+                )
+
+                if remaining_balance <= 0:
+                    break
+
+            df_schedule = pd.DataFrame(schedule)
+
+            # Principal vs. Interest Payments
+            fig_principal_interest = px.line(
+                df_schedule,
+                x="Month",
+                y=["Principal Payment", "Interest Payment"],
+                title="Principal and Interest Payments Over Time",
+                labels={"value": "Amount ($)", "Month": "Month"},
+                markers=True,
+                color_discrete_map={
+                    "Principal Payment": "green",
+                    "Interest Payment": "red",
+                },
             )
-            fig.update_layout(
-                xaxis_title="Amount ($)",
-                yaxis_title="Payment Breakdown",
+            fig_principal_interest.update_layout(
+                xaxis_title="Month",
+                yaxis_title="Amount ($)",
+                xaxis=dict(showline=True, showgrid=False),
+                yaxis=dict(showline=True, showgrid=True),
+                legend_title="Payment Type",
             )
 
-            st.plotly_chart(fig)
+            # Remaining Balance
+            fig_remaining_balance = px.line(
+                df_schedule,
+                x="Month",
+                y="Remaining Balance",
+                title="Remaining Balance Over Time",
+                labels={"Remaining Balance": "Remaining Balance ($)", "Month": "Month"},
+                markers=True,
+            )
+            fig_remaining_balance.update_layout(
+                xaxis_title="Month",
+                yaxis_title="Remaining Balance ($)",
+                xaxis=dict(showline=True, showgrid=False),
+                yaxis=dict(showline=True, showgrid=True),
+            )
+
+            tab1, tab2 = st.tabs(
+                ["📈 Principal vs. Interest Payments", "📉 Remaining Balance"]
+            )
+            with tab1:
+                st.plotly_chart(fig_principal_interest)
+            with tab2:
+                st.plotly_chart(fig_remaining_balance)
+
+            # Amoritsation Schedule
+            st.markdown("#### Amoritsation Schedule")
+            st.dataframe(
+                df_schedule,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode=["multi-column"],
+            )
+
+            csv = df_schedule.to_csv(index=False)
+            st.download_button(
+                label="Download Schedule as CSV", data=csv, mime="text/csv"
+            )
 
     def show_home_affordability(self):
         st.header(f"{self.page}", divider=True)
         st.subheader(f"Data Input", divider=True)
 
         monthly_income = st.number_input(
-            "Monthly Net Income ($)", min_value=3000, value=5000, step=1000
+            "Monthly Net Income ($)",
+            min_value=3000,
+            value=5000,
+            step=1000,
+            help="Monthly net income refers to the income you receive after tax, EPF and other required salary deductions",
         )
         monthly_debts = st.number_input(
-            "Monthly Commitments ($)", min_value=0, value=500, step=100
+            "Monthly Commitments ($)",
+            min_value=0,
+            value=500,
+            step=100,
+            help="Monthly commitments refers to any monthly payments to banks, such as payments for car loans, non-banking companies, such as instalments for electronic purchases",
         )
         interest_rate = st.number_input(
             "Interest Rate (%)", min_value=0.01, value=3.9, step=0.05
@@ -208,12 +278,21 @@ class MortgageCalculator:
             min_value=90000,
             value=int(property_price * 0.9),
             step=100000,
+            help="Loan amount will be automatically calculated as 90% of property price unless stated otherwise",
         )
         discount_percent = st.number_input(
-            "Discount (%)", min_value=0, max_value=100, value=0, step=1
+            "Discount (%)",
+            min_value=0,
+            max_value=100,
+            value=0,
+            step=1,
+            help="Percentrage discount given by seller on the property price",
         )
         down_payment_percent = st.number_input(
-            "Down Payment (%)", value=int(10 - discount_percent), disabled=True
+            "Down Payment (%)",
+            value=int(10 - discount_percent),
+            disabled=True,
+            help="Down payment starts at 10% and decreases based on the discount given",
         )
         stamp_duty_percent = st.number_input(
             "Stamp Duty for Loan Agreement (%)",
@@ -221,6 +300,7 @@ class MortgageCalculator:
             value=0.5,
             step=0.05,
             disabled=True,
+            help="Stamp duty for loan agreement is calculated as 0.5% of loan amount",
         )
 
         # Check waived fees
@@ -278,7 +358,7 @@ class MortgageCalculator:
             )
             total_upfront_costs = down_payment + total_fees
 
-            total_label = "Total Upfront Costs"
+            total_label = ":red[Total Upfront Costs] (:heavy_minus_sign:)"
             pie_labels = [
                 "Stamp Duty for LA",
                 "Stamp Duty for MOT",
@@ -293,11 +373,11 @@ class MortgageCalculator:
             ]
 
             if discount_percent > 10:
-                down_payment_label = "Rebates"
+                down_payment_label = ":green[Rebates] (:heavy_plus_sign:)"
                 if abs(down_payment) > (total_fees):
-                    total_label = "Total Rebates"
+                    total_label = ":green[Total Rebates] (:heavy_plus_sign:)"
             else:
-                down_payment_label = "Down Payment"
+                down_payment_label = ":red[Down Payment] (:heavy_minus_sign:)"
                 pie_labels.append(down_payment_label)
                 pie_values.append(down_payment)
 
@@ -397,12 +477,12 @@ class MortgageCalculator:
 
     def display_results(self, results):
         with st.sidebar:
-            st.subheader("Results", divider=True)
+            st.header("Results", divider=True)
 
             for key, value in results.items():
                 col1, col2 = st.columns([2, 1])
                 with col1:
-                    st.markdown(f"**{key}:**")
+                    st.markdown(f"**{key}**")
                 with col2:
                     st.markdown(f"{value}")
             st.markdown("---")
