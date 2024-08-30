@@ -257,6 +257,10 @@ class MortgageCalculator:
                 y=affordabilities,
                 labels={"x": "Monthly Income ($)", "y": "Maximum Home Price ($)"},
             )
+            fig.update_traces(
+                texttemplate="%{y}",  # Format text labels to show dollar amounts
+                textposition="outside",  # Position text outside the bars
+            )
             fig.update_layout(title="Home Affordability vs. Monthly Income")
 
             st.plotly_chart(fig)
@@ -395,29 +399,34 @@ class MortgageCalculator:
             st.markdown("***")
 
             # Plot chart
-            fig = px.pie(
-                names=pie_labels,
-                values=pie_values,
-                hole=0.4,
-                labels={"names": "Category", "values": "Amount ($)"},
-            )
-            fig.update_layout(title="Upfront Costs Distribution")
+            if any(pie_values):
+                fig = px.pie(
+                    names=pie_labels,
+                    values=pie_values,
+                    hole=0.4,
+                    labels={"names": "Category", "values": "Amount ($)"},
+                )
+                fig.update_traces(
+                    textposition="outside", textinfo="percent+label+value"
+                )
+                fig.update_layout(title="Upfront Costs Distribution")
+                st.plotly_chart(fig)
 
-            st.plotly_chart(fig)
-            st.caption(
-                """
-                **MOT Stamp Duty Calculation:**
-                - **Up to RM100,000:** 1% of the property price.
-                - **RM100,001 to RM500,000:** RM1,000 + 2% of the amount above RM100,000.
-                - **RM500,001 to RM1,000,000:** RM9,000 + 3% of the amount above RM500,000.
-                - **Above RM1,000,000:** RM24,000 + 4% of the amount above RM1,000,000.
+            with st.sidebar:
+                st.caption(
+                    """
+                    **MOT Stamp Duty Calculation:**
+                    - **Up to RM100,000:** 1% of the property price.
+                    - **RM100,001 to RM500,000:** RM1,000 + 2% of the amount above RM100,000.
+                    - **RM500,001 to RM1,000,000:** RM9,000 + 3% of the amount above RM500,000.
+                    - **Above RM1,000,000:** RM24,000 + 4% of the amount above RM1,000,000.
 
-                **Legal Fees Calculation:**
-                - **Up to RM500,000:** 1.25% of property price, with minimum of RM500
-                - **RM500,000 to RM7,000,000:** RM6,250 + 1% of the amount above RM500,000
-                - **Above RM7,000,000:** RM76,250
-                """
-            )
+                    **Legal Fees Calculation:**
+                    - **Up to RM500,000:** 1.25% of property price, with minimum of RM500
+                    - **RM500,000 to RM7,000,000:** RM6,250 + 1% of the amount above RM500,000
+                    - **Above RM7,000,000:** RM76,250
+                    """
+                )
 
     # Utility Methods for Calculations
     def calculate_monthly_payment(self, loan_amount, interest_rate, loan_tenure):
