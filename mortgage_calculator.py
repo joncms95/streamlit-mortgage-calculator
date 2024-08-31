@@ -84,8 +84,12 @@ class MortgageCalculator:
         has_maintenance_fees = st.toggle("Include maintenance fees? :wrench:")
         if has_maintenance_fees:
             square_feet = st.number_input(
-                "Unit Size (sq ft)", min_value=100, value=900, step=100
+                "Unit Size (sq ft)",
+                min_value=100,
+                value=900,
+                step=100,
             )
+            st.caption(f"Price per sq ft ($): {round(property_price / square_feet, 2)}")
             maintenance_fees_per_sqft = st.number_input(
                 "Maintenance Fees per sq ft ($)",
                 min_value=0.0,
