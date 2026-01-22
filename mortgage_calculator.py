@@ -267,13 +267,9 @@ class MortgageCalculator:
                 step = 5000
 
             incomes = list(range(min_income, max_income + step, step))
-            # Ensure user's income is in the list (round to nearest step)
-            user_income_rounded = (int(monthly_income) // step) * step
-            if (
-                user_income_rounded not in incomes
-                and min_income <= user_income_rounded <= max_income
-            ):
-                incomes.append(user_income_rounded)
+            user_income = int(monthly_income)
+            if user_income not in incomes and min_income <= user_income <= max_income:
+                incomes.append(user_income)
                 incomes.sort()
 
             affordabilities = [
@@ -296,8 +292,8 @@ class MortgageCalculator:
                 colors = []
                 user_income_in_chart = False
                 for inc in chart_incomes:
-                    # Check if this income matches user's rounded income
-                    if inc == user_income_rounded:
+                    # Check if this income matches user's actual income
+                    if inc == user_income:
                         colors.append("rgba(255, 0, 0, 0.8)")  # Red for user's income
                         user_income_in_chart = True
                     else:
