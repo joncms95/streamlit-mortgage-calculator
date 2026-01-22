@@ -126,13 +126,11 @@ class MortgageCalculator:
             schedule = []
             monthly_interest_rate = (interest_rate / 100) / 12
             remaining_balance = loan_amount
-            total_interest_paid = 0
 
             for month in range(1, loan_tenure * 12 + 1):
                 interest_payment = remaining_balance * monthly_interest_rate
                 principal_payment = monthly_payment - interest_payment
                 remaining_balance -= principal_payment
-                total_interest_paid += interest_payment
 
                 schedule.append(
                     {
@@ -241,14 +239,43 @@ class MortgageCalculator:
                 monthly_income, monthly_debts, interest_rate, loan_tenure
             )
 
-            self.display_results(
-                {"Suggested Property Value": f"${max_property_price:,.2f}"}
-            )
+            # Check if monthly debts are too high
+            if max_property_price == 0:
+                warning_msg = "⚠️ Your monthly commitments exceed 40% of your monthly income. Please reduce your monthly commitments to afford a home."
+                st.warning(warning_msg)
+                self.display_results({"Suggested Property Value": "$0.00"})
+            else:
+                self.display_results(
+                    {"Suggested Property Value": f"${max_property_price:,.2f}"}
+                )
 
             st.markdown("***")
 
             # Plot chart
-            incomes = list(range(3000, 15001, 1000))  # Monthly incomes from 3k to 15k
+            min_income = max(3000, int(monthly_income * 0.5))
+            max_income = max(int(monthly_income * 2.0), monthly_income + 5000)
+            min_income = (min_income // 1000) * 1000
+            max_income = ((max_income // 1000) + 1) * 1000
+
+            # Determine step size based on range
+            income_range = max_income - min_income
+            if income_range <= 10000:
+                step = 1000
+            elif income_range <= 20000:
+                step = 2000
+            else:
+                step = 5000
+
+            incomes = list(range(min_income, max_income + step, step))
+            # Ensure user's income is in the list (round to nearest step)
+            user_income_rounded = (int(monthly_income) // step) * step
+            if (
+                user_income_rounded not in incomes
+                and min_income <= user_income_rounded <= max_income
+            ):
+                incomes.append(user_income_rounded)
+                incomes.sort()
+
             affordabilities = [
                 self.calculate_home_affordability(
                     income, monthly_debts, interest_rate, loan_tenure
@@ -256,21 +283,54 @@ class MortgageCalculator:
                 for income in incomes
             ]
 
-            fig = px.bar(
-                x=incomes,
-                y=affordabilities,
-                labels={"x": "Monthly Income ($)", "y": "Maximum Home Price ($)"},
-            )
-            fig.update_traces(
-                texttemplate="%{y}",  # Format text labels to show dollar amounts
-                textposition="outside",  # Position text outside the bars
-            )
-            fig.update_layout(title="Home Affordability vs. Monthly Income")
+            # Filter out negative values and ensure non-negative for chart
+            chart_data = [
+                (inc, aff) for inc, aff in zip(incomes, affordabilities) if aff > 0
+            ]
+            if chart_data:
+                chart_incomes, chart_affordabilities = zip(*chart_data)
+                chart_incomes = list(chart_incomes)
+                chart_affordabilities = list(chart_affordabilities)
 
-            st.plotly_chart(fig)
+                # Create color array to highlight user's current income
+                colors = []
+                user_income_in_chart = False
+                for inc in chart_incomes:
+                    # Check if this income matches user's rounded income
+                    if inc == user_income_rounded:
+                        colors.append("rgba(255, 0, 0, 0.8)")  # Red for user's income
+                        user_income_in_chart = True
+                    else:
+                        colors.append("rgba(31, 119, 180, 0.8)")  # Blue for others
+
+                fig = px.bar(
+                    x=list(chart_incomes),
+                    y=list(chart_affordabilities),
+                    labels={"x": "Monthly Income ($)", "y": "Maximum Home Price ($)"},
+                )
+
+                # Apply custom colors
+                fig.update_traces(
+                    marker_color=colors,
+                    texttemplate="%{y:$,.0f}",  # Format text labels to show dollar amounts
+                    textposition="outside",  # Position text outside the bars
+                )
+                fig.update_layout(
+                    title="Home Affordability vs. Monthly Income",
+                    xaxis=dict(tickformat="$,.0f"),
+                    yaxis=dict(tickformat="$,.0f"),
+                )
+                st.plotly_chart(fig)
+                if user_income_in_chart:
+                    st.caption("🔴 Red bar indicates your current monthly income")
+            else:
+                st.info(
+                    "📊 Chart not available: Monthly commitments are too high for the income range shown. "
+                    "Reduce your monthly commitments to see affordability projections."
+                )
             st.caption(
                 """
-                **Calculations are done assuming a debt-to-income ratio of 30%**
+                **Calculations are done assuming a debt-to-income ratio of 40%**
                 """
             )
 
@@ -449,8 +509,13 @@ class MortgageCalculator:
     def calculate_home_affordability(
         self, monthly_income, monthly_debts, interest_rate, loan_tenure
     ):
-        # Assuming a debt-to-income ratio of 30%
-        max_monthly_payment = (monthly_income * 0.30) - monthly_debts
+        # Assuming a debt-to-income ratio of 40%
+        max_monthly_payment = (monthly_income * 0.40) - monthly_debts
+
+        # If monthly debts exceed the total debt ratio, no affordable property
+        if max_monthly_payment <= 0:
+            return 0
+
         max_loan = (
             max_monthly_payment
             * (math.pow(1 + interest_rate / 100 / 12, loan_tenure * 12) - 1)
@@ -483,10 +548,10 @@ class MortgageCalculator:
     def calculate_legal_fees(self, property_price):
         if property_price <= 500000:
             return max(property_price * 0.0125, 500)
-        elif property_price > 500000:
-            return 6250 + (property_price - 500000) * 0.01
         elif property_price > 7000000:
             return 76250
+        elif property_price > 500000:
+            return 6250 + (property_price - 500000) * 0.01
 
     def display_results(self, results):
         with st.sidebar:
