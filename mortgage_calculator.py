@@ -11,6 +11,7 @@ class MortgageCalculator:
         "Monthly Mortgage Estimation",
         "Home Affordability Estimation",
         "Upfront Costs Estimation",
+        "Compounding Interest Calculator",
     ]
 
     def __init__(self):
@@ -37,6 +38,8 @@ class MortgageCalculator:
             return self.show_home_affordability()
         if self.page == "Upfront Costs Estimation":
             return self.show_upfront_costs()
+        if self.page == "Compounding Interest Calculator":
+            return self.show_compounding_interest()
 
     def render_sidebar(self):
         with st.sidebar:
@@ -193,7 +196,7 @@ class MortgageCalculator:
                 st.plotly_chart(fig_remaining_balance)
 
             # Amoritsation Schedule
-            st.markdown("#### Amoritsation Schedule")
+            st.markdown("**Amoritsation Schedule**")
             st.dataframe(
                 df_schedule,
                 use_container_width=True,
@@ -324,11 +327,9 @@ class MortgageCalculator:
                     "📊 Chart not available: Monthly commitments are too high for the income range shown. "
                     "Reduce your monthly commitments to see affordability projections."
                 )
-            st.caption(
-                """
+            st.caption("""
                 **Calculations are done assuming a debt-to-income ratio of 40%**
-                """
-            )
+                """)
 
     def show_upfront_costs(self):
         st.header(f"{self.page}", divider=True)
@@ -473,8 +474,7 @@ class MortgageCalculator:
                 st.plotly_chart(fig)
 
             with st.sidebar:
-                st.caption(
-                    """
+                st.caption("""
                     **MOT Stamp Duty Calculation:**
                     - **Up to RM100,000:** 1% of the property price.
                     - **RM100,001 to RM500,000:** RM1,000 + 2% of the amount above RM100,000.
@@ -485,7 +485,135 @@ class MortgageCalculator:
                     - **Up to RM500,000:** 1.25% of property price, with minimum of RM500
                     - **RM500,000 to RM7,000,000:** RM6,250 + 1% of the amount above RM500,000
                     - **Above RM7,000,000:** RM76,250
-                    """
+                    """)
+
+    def show_compounding_interest(self):
+        st.header(f"{self.page}", divider=True)
+        st.subheader(f"Data Input", divider=True)
+
+        initial_principal = st.number_input(
+            "Initial Investment ($)",
+            min_value=0.0,
+            value=0.0,
+            step=100.0,
+            help="Starting amount you invest or save today",
+        )
+        contribution_amount = st.number_input(
+            "Contribution Amount ($)",
+            min_value=0.0,
+            value=1000.0,
+            step=10.0,
+            help="Amount added at each contribution interval",
+        )
+        contribution_frequency = st.selectbox(
+            "Contribution Frequency",
+            ["Monthly", "Quarterly", "Annually"],
+            index=0,
+        )
+        annual_rate = st.number_input(
+            "Annual Interest Rate (%)",
+            min_value=0.0,
+            value=4.0,
+            step=0.1,
+            help="Expected annual growth rate",
+        )
+        years = st.number_input(
+            "Years",
+            min_value=1,
+            max_value=100,
+            value=10,
+            step=1,
+            help="How long the money will grow",
+        )
+        compounding_frequency = st.selectbox(
+            "Compounding Frequency",
+            ["Daily", "Monthly", "Quarterly", "Semiannually", "Annually"],
+            index=4,
+        )
+        contribution_timing = st.radio(
+            "Contributions at",
+            ["Beginning of period", "End of period"],
+            horizontal=True,
+        )
+
+        if self.auto_check or st.session_state.check_results:
+            projection = self.calculate_compounding_interest(
+                initial_principal,
+                contribution_amount,
+                contribution_frequency,
+                annual_rate,
+                years,
+                compounding_frequency,
+                contribution_timing,
+            )
+
+            contribution_period = {
+                "Monthly": "month",
+                "Quarterly": "quarter",
+                "Annually": "year",
+            }[contribution_frequency]
+            year_label = "year" if years == 1 else "years"
+            contributed_text = f"${projection['total_contributions']:,.2f}"
+            interest_text = f"${projection['interest_earned']:,.2f}"
+            future_value_text = f"${projection['future_value']:,.2f}"
+
+            results = {
+                "Initial Investment": f"${initial_principal:,.2f}",
+                "Total Contributions": f"${projection['total_contributions']:,.2f}",
+                "Interest Earned": f"${projection['interest_earned']:,.2f}",
+                "Future Value": future_value_text,
+            }
+            self.display_results(results)
+
+            st.markdown("***")
+
+            st.markdown(
+                f"<div style='background:#ffffff; border:1px solid #dbeafe; border-radius:24px; padding:26px 30px; line-height:1.75; font-size:1rem; box-shadow:0 24px 55px rgba(15,23,42,0.08); max-width:760px; margin:0 auto 28px auto;'>"
+                f"<div style='color:#0f172a; font-size:1rem; margin-bottom:0.9rem;'>"
+                f"In the span of <strong>{years} {year_label}</strong>, contributing <strong>${contribution_amount:,.2f}</strong> per {contribution_period},<br>"
+                f"you will have contributed <strong>{contributed_text}</strong> and earned <strong>{interest_text}</strong>."
+                f"</div>"
+                f"<div style='font-size:1.45em; font-weight:700; color:#1d4ed8; line-height:1.35; margin-top:0.65rem;'>"
+                f"The future value of your investment is <strong>{future_value_text}</strong>."
+                f"</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Future Value", f"${projection['future_value']:,.2f}")
+            with col2:
+                st.metric(
+                    "Total Contributions", f"${projection['total_contributions']:,.2f}"
+                )
+            with col3:
+                st.metric("Interest Earned", f"${projection['interest_earned']:,.2f}")
+
+            df_projection = pd.DataFrame(projection["schedule"])
+            if not df_projection.empty:
+                fig = px.line(
+                    df_projection,
+                    x="Year",
+                    y="Ending Balance",
+                    title="Projected Balance Over Time",
+                    labels={"Year": "Year", "Ending Balance": "Balance ($)"},
+                    markers=True,
+                )
+                fig.update_layout(
+                    xaxis_title="Year",
+                    yaxis_title="Balance ($)",
+                    xaxis=dict(showline=True, showgrid=False),
+                    yaxis=dict(showline=True, showgrid=True),
+                )
+                st.plotly_chart(fig)
+
+                st.markdown("**Yearly Growth Schedule**")
+                st.dataframe(
+                    df_projection,
+                    use_container_width=True,
+                    on_select="rerun",
+                    selection_mode=["multi-column"],
                 )
 
     # Utility Methods for Calculations
@@ -549,6 +677,81 @@ class MortgageCalculator:
         elif property_price > 500000:
             return 6250 + (property_price - 500000) * 0.01
 
+    def calculate_compounding_interest(
+        self,
+        initial_principal,
+        contribution_amount,
+        contribution_frequency,
+        annual_rate,
+        years,
+        compounding_frequency,
+        contribution_timing,
+    ):
+        contribution_interval_months = {
+            "Monthly": 1,
+            "Quarterly": 3,
+            "Annually": 12,
+        }[contribution_frequency]
+
+        balance = float(initial_principal)
+        total_contributions = float(initial_principal)
+        total_months = int(years * 12)
+        monthly_rate = self.get_monthly_rate(annual_rate, compounding_frequency)
+
+        schedule = []
+        year_start_balance = balance
+        year_contributions = 0.0
+        year_number = 1
+
+        for month in range(1, total_months + 1):
+            contribution_due = ((month - 1) % contribution_interval_months) == 0
+
+            if contribution_due and contribution_timing == "Beginning of period":
+                balance += contribution_amount
+                total_contributions += contribution_amount
+                year_contributions += contribution_amount
+
+            balance *= 1 + monthly_rate
+
+            if contribution_due and contribution_timing == "End of period":
+                balance += contribution_amount
+                total_contributions += contribution_amount
+                year_contributions += contribution_amount
+
+            if month % 12 == 0 or month == total_months:
+                year_interest = balance - year_start_balance - year_contributions
+                schedule.append(
+                    {
+                        "Year": year_number,
+                        "Starting Balance": round(year_start_balance, 2),
+                        "Contributions": round(year_contributions, 2),
+                        "Interest Earned": round(year_interest, 2),
+                        "Ending Balance": round(balance, 2),
+                    }
+                )
+                year_number += 1
+                year_start_balance = balance
+                year_contributions = 0.0
+
+        return {
+            "future_value": balance,
+            "total_contributions": total_contributions,
+            "interest_earned": balance - total_contributions,
+            "schedule": schedule,
+        }
+
+    def get_monthly_rate(self, annual_rate, compounding_frequency):
+        annual_rate = annual_rate / 100
+        if compounding_frequency == "Daily":
+            return (1 + annual_rate / 365) ** 30 - 1
+        if compounding_frequency == "Monthly":
+            return annual_rate / 12
+        if compounding_frequency == "Quarterly":
+            return (1 + annual_rate / 4) ** (1 / 3) - 1
+        if compounding_frequency == "Semiannually":
+            return (1 + annual_rate / 2) ** (1 / 6) - 1
+        return (1 + annual_rate) ** (1 / 12) - 1
+
     def display_results(self, results):
         with st.sidebar:
             st.header("Results", divider=True)
@@ -558,7 +761,10 @@ class MortgageCalculator:
                 with col1:
                     st.markdown(f"**{key}**")
                 with col2:
-                    st.markdown(f"{value}")
+                    st.markdown(
+                        f"<div style='text-align:right;'>{value}</div>",
+                        unsafe_allow_html=True,
+                    )
             st.markdown("---")
 
 
